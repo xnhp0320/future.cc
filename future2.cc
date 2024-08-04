@@ -137,8 +137,8 @@ public:
     if (_pr) {
       _pr -> _future = this;
       _pr -> _state = &_state;
+      other.detach();
     }
-    other.detach();
   }
 
   auto get_promise() {
@@ -185,6 +185,7 @@ public:
     } else {
       //this future is going to destruct
       //detach the promise with this future
+      assert(_pr);
       detach()->sched_task([res_pr = fut.get_promise(), func = std::forward<Func>(f)](future_state<T> * _s) mutable {
           res_pr.set_value(func(_s->get()));
       });
