@@ -17,8 +17,10 @@ int main() {
   S s;
   S s2 = std::move(s);
 
-  [&]() mutable {
-    S s_ = std::move(s2);
+  [s3 = s2]() {
+    TD<decltype((s3))> xxx;
+    TD<decltype(s3)> xxx;
+    S s_ = std::move(s3);
     (void)s_;
   }();
 }
