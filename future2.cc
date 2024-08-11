@@ -121,6 +121,29 @@ public:
 };
 
 template <typename T>
+struct futurator {
+  template <typename Func>
+  static auto apply(Func &&f, T&& t) {
+    return f(std::forward<T>(t));
+  }
+
+  template <typename Func>
+  using Result_t = std::invoke_result_t<Func, T>;
+};
+
+template <typename ...Args>
+struct futurator<std::tuple<Args...>> {
+  template <typename Func>
+  static auto apply(Func &&f, const std::tuple<Args...>& tuple) {
+    return std::apply(std::forward<Func>(f), tuple);
+  }
+
+  template <typename Func>
+  using Result_t = std::invoke_result_t<Func, Args...>;
+};
+
+
+template <typename T>
 class future {
   future_state<T> _state;
   promise<T> *_pr;
@@ -175,20 +198,20 @@ public:
   T&& get() { return get_state()->get(); }
 
   template <typename Func>
-  auto then(Func &&f) -> future<std::invoke_result_t<Func, T>> {
-    using Res = std::invoke_result_t<Func, T>;
+  auto then(Func &&f) -> future<typename futurator<T>::Result_t<Func>> {
+    using Res = typename futurator<T>::Result_t<Func>;
 
     future<Res> fut;
 
     if (available()) {
-      fut.set_value(std::forward<Func>(f)(_state.get()));
+      fut.set_value(futurator<T>::apply(std::forward<Func>(f), _state.get()));
     } else {
       //this future is going to destruct
       //detach the promise with this future
       assert(_pr);
       //if f is a Func&, we move the f into the lambda.
       detach()->sched_task([res_pr = fut.get_promise(), func = std::move(f)](future_state<T> * _s) mutable {
-          res_pr.set_value(func(_s->get()));
+          res_pr.set_value(futurator<T>::apply(func, _s->get()));
       });
     }
     return fut;
@@ -196,10 +219,11 @@ public:
 
 };
 
+
 int main() {
   promise<int> x;
   auto f = x.get_future();
-  auto y = f.then([](int x) { return  x * 3;}).then([](int y) { return y * 2; });
+  auto y = f.then([](int x) { return std::make_tuple(0, x * 3);}).then([](int x, int y) { return y * 2; });
   x.set_value(2);
   std::cout << y.get() << std::endl;
 }
