@@ -181,12 +181,13 @@ public:
     future<Res> fut;
 
     if (available()) {
-      fut.set_value(f(_state.get()));
+      fut.set_value(std::forward<Func>(f)(_state.get()));
     } else {
       //this future is going to destruct
       //detach the promise with this future
       assert(_pr);
-      detach()->sched_task([res_pr = fut.get_promise(), func = std::forward<Func>(f)](future_state<T> * _s) mutable {
+      //if f is a Func&, we move the f into the lambda.
+      detach()->sched_task([res_pr = fut.get_promise(), func = std::move(f)](future_state<T> * _s) mutable {
           res_pr.set_value(func(_s->get()));
       });
     }
@@ -198,7 +199,7 @@ public:
 int main() {
   promise<int> x;
   auto f = x.get_future();
-  auto y = f.then([](int x) { return x * 3;}).then([](int y) { return y * 2; });
+  auto y = f.then([](int x) { return  x * 3;}).then([](int y) { return y * 2; });
   x.set_value(2);
   std::cout << y.get() << std::endl;
 }
