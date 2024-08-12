@@ -145,7 +145,7 @@ struct invoke_result_tuple<true, Func, Args...> {
 template <typename ...Args>
 struct futurator<std::tuple<Args...>> {
   template <typename Func>
-  static auto apply(Func &&f, const std::tuple<Args...>& tuple) {
+  static auto apply(Func &&f, std::tuple<Args...>&& tuple) {
     if constexpr (std::is_invocable_v<Func, Args...>) {
       return std::apply(std::forward<Func>(f), tuple);
     } else {
@@ -238,7 +238,7 @@ public:
 int main() {
   promise<int> x;
   auto f = x.get_future();
-  auto y = f.then([](int x) { return std::make_tuple(0, x * 3);}).then([](const std::tuple<int,int>& v) { return std::get<1>(v) * 2; });
+  auto y = f.then([](int x) { return std::make_tuple(0, x * 3);}).then([](std::tuple<int,int> v) { return std::get<1>(v) * 2; });
   x.set_value(2);
   std::cout << y.get() << std::endl;
 }
