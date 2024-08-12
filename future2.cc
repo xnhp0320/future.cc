@@ -4,6 +4,7 @@
 #include <memory>
 #include <iostream>
 #include <cassert>
+#include <functional>
 
 template <typename T>
 class my_future;
@@ -131,15 +132,29 @@ struct futurator {
   using Result_t = std::invoke_result_t<Func, T>;
 };
 
+template <bool tuple_callable, typename Func, typename ...Args>
+struct invoke_result_tuple {
+  using type = std::invoke_result_t<Func, std::tuple<Args...>>;
+};
+
+template <typename Func, typename ...Args>
+struct invoke_result_tuple<true, Func, Args...> {
+  using type = std::invoke_result_t<Func, Args...>;
+};
+
 template <typename ...Args>
 struct futurator<std::tuple<Args...>> {
   template <typename Func>
   static auto apply(Func &&f, const std::tuple<Args...>& tuple) {
-    return std::apply(std::forward<Func>(f), tuple);
+    if constexpr (std::is_invocable_v<Func, Args...>) {
+      return std::apply(std::forward<Func>(f), tuple);
+    } else {
+      return std::forward<Func>(f)(tuple);
+    }
   }
 
   template <typename Func>
-  using Result_t = std::invoke_result_t<Func, Args...>;
+  using Result_t = typename invoke_result_tuple<std::is_invocable_v<Func, Args...>, Func, Args...>::type;
 };
 
 
@@ -223,7 +238,7 @@ public:
 int main() {
   promise<int> x;
   auto f = x.get_future();
-  auto y = f.then([](int x) { return std::make_tuple(0, x * 3);}).then([](int x, int y) { return y * 2; });
+  auto y = f.then([](int x) { return std::make_tuple(0, x * 3);}).then([](const std::tuple<int,int>& v) { return std::get<1>(v) * 2; });
   x.set_value(2);
   std::cout << y.get() << std::endl;
 }
